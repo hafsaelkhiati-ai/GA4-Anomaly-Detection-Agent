@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GA4 Anomaly Agent</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --void:#05070d; --deep:#0a0e1a; --surface:#0f1525; --card:#141928;
+      --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+      --cyan:#00d4ff; --cyan-dim:rgba(0,212,255,0.12); --cyan-glow:rgba(0,212,255,0.35);
+      --green:#00e676; --green-dim:rgba(0,230,118,0.12);
+      --red:#ff4f6e; --red-dim:rgba(255,79,110,0.12);
+      --orange:#ffab40; --orange-dim:rgba(255,171,64,0.12);
+      --text:#e8edf7; --muted:#5a6480; --soft:#8892aa;
+      --syne:'Syne',sans-serif; --sans:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+      --r:14px; --rs:8px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--void);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;overflow-x:hidden}
+    body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,212,255,0.03)1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03)1px,transparent 1px);background-size:40px 40px;pointer-events:none;animation:gridP 8s ease-in-out infinite}
+    @keyframes gridP{0%,100%{opacity:.5}50%{opacity:1}}
+
+    /* TOPBAR */
+    .topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:62px;background:rgba(5,7,13,.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:20px}
+    .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+    .brand-icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),#0072ff);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;box-shadow:0 0 20px var(--cyan-glow);animation:iconP 3s ease-in-out infinite}
+    @keyframes iconP{0%,100%{box-shadow:0 0 20px var(--cyan-glow)}50%{box-shadow:0 0 35px var(--cyan-glow),0 0 60px rgba(0,212,255,.15)}}
+    .brand-name{font-family:var(--syne);font-weight:800;font-size:16px;color:var(--text);letter-spacing:-.3px}
+    .brand-tag{font-family:var(--mono);font-size:10px;color:var(--cyan);letter-spacing:.1em}
+    .topbar-center{flex:1;display:flex;justify-content:center}
+    .live-pill{display:flex;align-items:center;gap:8px;background:var(--green-dim);border:1px solid rgba(0,230,118,.25);border-radius:100px;padding:5px 14px;font-size:12px;font-family:var(--mono);color:var(--green)}
+    .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:liveP 1.5s ease-in-out infinite}
+    @keyframes liveP{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+    .topbar-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+    .btn-run{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--cyan),#0088ff);color:#000;font-family:var(--syne);font-weight:700;font-size:13px;border:none;border-radius:var(--rs);padding:9px 20px;cursor:pointer;transition:all .25s;box-shadow:0 4px 20px rgba(0,212,255,.3)}
+    .btn-run:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(0,212,255,.5)}
+    .btn-icon{width:36px;height:36px;border-radius:var(--rs);background:var(--card);border:1px solid var(--border);color:var(--soft);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+    .btn-icon:hover{border-color:var(--cyan);color:var(--cyan)}
+
+    /* LAYOUT */
+    .layout{display:flex;padding-top:62px;min-height:100vh;position:relative;z-index:1}
+
+    /* SIDEBAR */
+    .sidebar{width:240px;flex-shrink:0;background:rgba(10,14,26,.6);border-right:1px solid var(--border);backdrop-filter:blur(10px);padding:24px 12px;position:sticky;top:62px;height:calc(100vh - 62px);overflow-y:auto;display:flex;flex-direction:column}
+    .nav-section{margin-bottom:28px}
+    .nav-section-label{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:0 12px 10px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--rs);cursor:pointer;font-size:13px;color:var(--soft);transition:all .2s;margin-bottom:2px;text-decoration:none;position:relative;overflow:hidden}
+    .nav-item::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:0;border-radius:0 3px 3px 0;background:var(--cyan);transition:height .2s}
+    .nav-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+    .nav-item.active{background:var(--cyan-dim);color:var(--cyan)}
+    .nav-item.active::before{height:70%}
+    .nav-item i{font-size:16px;width:20px;text-align:center}
+    .nav-badge{margin-left:auto;background:var(--red-dim);color:var(--red);font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;border:1px solid rgba(255,79,110,.25)}
+    .sidebar-div{height:1px;background:var(--border);margin:0 12px 24px}
+    .sidebar-bottom{margin-top:auto;padding:0 4px}
+    .uptime-box{background:var(--deep);border:1px solid var(--border);border-radius:10px;padding:14px}
+    .prog-bar{height:3px;background:rgba(255,255,255,.05);border-radius:100px;overflow:hidden;margin-top:8px}
+    .prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:100px;animation:progS 2s ease-in-out infinite}
+    @keyframes progS{0%{width:0%;margin-left:0%}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}
+
+    /* MAIN */
+    .main{flex:1;padding:32px 36px;overflow-y:auto}
+    .page{animation:fadeUp .4s ease both}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .hidden{display:none!important}
+
+    /* PAGE HEADER */
+    .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px}
+    .page-title{font-family:var(--syne);font-size:26px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(135deg,var(--text),var(--soft));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .page-sub{font-size:13px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:6px}
+    .hdr-actions{display:flex;gap:10px}
+
+    /* METRIC CARDS */
+    .metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .mc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px 22px 18px;position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s;animation:fadeUp .5s ease both}
+    .mc:nth-child(1){animation-delay:.05s}.mc:nth-child(2){animation-delay:.1s}.mc:nth-child(3){animation-delay:.15s}.mc:nth-child(4){animation-delay:.2s}
+    .mc:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+    .mc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--mc-accent,var(--cyan));border-radius:var(--r) var(--r) 0 0}
+    .mc.green{--mc-accent:var(--green)}.mc.red{--mc-accent:var(--red)}.mc.orange{--mc-accent:var(--orange)}
+    .mc-bg-icon{position:absolute;right:16px;top:16px;font-size:42px;opacity:.06;color:var(--mc-accent,var(--cyan))}
+    .mc-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px}
+    .mc-val{font-family:var(--syne);font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--text)}
+    .mc-foot{margin-top:10px;display:flex;align-items:center;gap:6px}
+    .delta{font-family:var(--mono);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:100px}
+    .d-up{background:var(--red-dim);color:var(--red)}.d-down{background:var(--red-dim);color:var(--red)}.d-neu{background:rgba(255,255,255,.05);color:var(--muted)}.d-ok{background:var(--green-dim);color:var(--green)}
+
+    /* GLASS CARD */
+    .gc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px;animation:fadeUp .5s ease both}
+    .gc:nth-child(1){animation-delay:.25s}.gc:nth-child(2){animation-delay:.3s}
+    .gc-head{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+    .gc-title{font-family:var(--syne);font-weight:700;font-size:14px;color:var(--text);display:flex;align-items:center;gap:9px}
+    .gc-title i{color:var(--cyan);font-size:16px}
+
+    /* BADGES */
+    .bdg{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid}
+    .bdg-crit{background:var(--red-dim);color:var(--red);border-color:rgba(255,79,110,.3)}
+    .bdg-warn{background:var(--orange-dim);color:var(--orange);border-color:rgba(255,171,64,.3)}
+    .bdg-info{background:var(--cyan-dim);color:var(--cyan);border-color:rgba(0,212,255,.3)}
+    .bdg-ok{background:var(--green-dim);color:var(--green);border-color:rgba(0,230,118,.3)}
+
+    /* TABLE */
+    .atbl{width:100%;border-collapse:collapse}
+    .atbl th{padding:10px 18px;font-size:10px;font-weight:600;font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+    .atbl td{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+    .atbl tr:last-child td{border-bottom:none}
+    .atbl tr{transition:background .15s;animation:slideIn .4s ease both}
+    .atbl tr:nth-child(1){animation-delay:.1s}.atbl tr:nth-child(2){animation-delay:.2s}
+    .atbl tr:hover td{background:rgba(255,255,255,.025)}
+    @keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+    .mpill{display:inline-flex;align-items:center;gap:7px;font-family:var(--syne);font-weight:700;font-size:13px;color:var(--text)}
+    .mono-v{font-family:var(--mono);font-size:13px;color:var(--text)}
+    .chg{font-family:var(--mono);font-weight:600;font-size:14px}
+    .chg.dn{color:var(--red)}.chg.pos{color:var(--green)}
+    .hyp-cell{font-size:12px;line-height:1.6;color:var(--soft);max-width:260px}
+    .act-cell{font-size:12px;line-height:1.6;color:var(--cyan);max-width:200px}
+
+    /* TERMINAL */
+    .terminal{background:#020408;border-radius:0 0 var(--r) var(--r);padding:18px 22px;font-family:var(--mono);font-size:12.5px;height:220px;overflow-y:auto;line-height:1.8}
+    .terminal::-webkit-scrollbar{width:4px}
+    .terminal::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+    .ll{display:flex;gap:12px}
+    .lts{color:#2a3a5a;flex-shrink:0}
+    .llv{flex-shrink:0;width:38px}
+    .li{color:var(--cyan)}.lo{color:var(--green)}.lw{color:var(--orange)}.le{color:var(--red)}.ld{color:var(--muted)}
+    .cursor{display:inline-block;width:8px;height:14px;background:var(--cyan);vertical-align:middle;animation:blink 1.1s step-end infinite;margin-left:4px}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+    /* EMPTY STATE */
+    .empty{text-align:center;padding:56px 20px}
+    .e-icon{width:64px;height:64px;border-radius:18px;background:var(--green-dim);border:1px solid rgba(0,230,118,.2);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--green);margin:0 auto 18px;animation:bob 3s ease-in-out infinite}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    .e-title{font-family:var(--syne);font-weight:700;font-size:17px;color:var(--text);margin-bottom:8px}
+    .e-sub{font-size:13px;color:var(--muted);line-height:1.7}
+
+    /* SETTINGS */
+    .stabs{display:flex;gap:4px;border-bottom:1px solid var(--border);padding:0 22px;background:rgba(255,255,255,.02)}
+    .stab{padding:13px 16px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);transition:all .2s;margin-bottom:-1px;display:flex;align-items:center;gap:7px}
+    .stab:hover{color:var(--text)}.stab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+    .stab i{font-size:15px}
+    .sbody{padding:26px 24px}
+    .fg{margin-bottom:20px}
+    .fl{display:block;font-size:12px;font-weight:600;color:var(--soft);margin-bottom:7px;letter-spacing:.02em}
+    .fl .req{color:var(--red);margin-left:3px}
+    .fcd{width:100%;padding:10px 14px;background:var(--deep);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:13px;font-family:var(--mono);outline:none;transition:border-color .2s,box-shadow .2s}
+    .fcd:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+    .fcd::placeholder{color:var(--muted)}
+    .fhint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
+    .fhint a{color:var(--cyan)}
+    .ibox{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.18);border-radius:var(--rs);padding:14px 16px;font-size:12px;color:var(--soft);line-height:1.8}
+    .ibox strong{color:var(--cyan)}
+    .ibox code{color:var(--orange);font-family:var(--mono);font-size:11px}
+
+    /* CODE BLOCK */
+    .codebl{background:#020408;border:1px solid var(--border);border-radius:var(--rs);padding:16px 18px;font-family:var(--mono);font-size:12.5px;color:var(--green);line-height:1.8;position:relative;overflow:hidden;margin-bottom:14px}
+    .codebl .cm{color:#2a4060}
+    .codebl::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,var(--cyan),var(--green))}
+    .cron-ref{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--rs);padding:16px 18px;font-size:12px;color:var(--soft);line-height:2}
+    .cron-ref code{color:var(--text);font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px}
+
+    /* BUTTONS */
+    .btn-save{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--green),#00b359);color:#000;font-family:var(--syne);font-weight:700;font-size:13px;border:none;border-radius:var(--rs);padding:10px 22px;cursor:pointer;transition:all .25s;box-shadow:0 4px 20px rgba(0,230,118,.3)}
+    .btn-save:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(0,230,118,.5)}
+    .btn-out{display:inline-flex;align-items:center;gap:7px;background:transparent;color:var(--cyan);border:1px solid rgba(0,212,255,.35);border-radius:var(--rs);padding:8px 16px;cursor:pointer;font-size:13px;font-family:var(--sans);transition:all .2s}
+    .btn-out:hover{background:var(--cyan-dim);border-color:var(--cyan)}
+    .btn-sm{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--rs);color:var(--soft);font-size:12px;padding:5px 12px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px}
+    .btn-sm:hover{border-color:var(--border2);color:var(--text)}
+
+    /* TOAST */
+    .toast-wrap{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px}
+    .toast-i{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:14px 18px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.5);animation:tIn .3s ease both;min-width:280px}
+    @keyframes tIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:5px}
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <a class="brand" href="#">
+    <div class="brand-icon"><i class="bi bi-broadcast"></i></div>
+    <div>
+      <div class="brand-name">GA4 Anomaly Agent</div>
+      <div class="brand-tag">AGENT 04 · 24/7 MONITORING</div>
+    </div>
+  </a>
+  <div class="topbar-center">
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      <span>AGENT LIVE &nbsp;·&nbsp; Next run 07:00 AM</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="btn-icon" title="Notifications"><i class="bi bi-bell"></i></div>
+    <div class="btn-icon" title="Refresh" onclick="toast('bi-arrow-clockwise','Refreshing data...','info')"><i class="bi bi-arrow-clockwise"></i></div>
+    <button class="btn-run" onclick="triggerRun()">
+      <i class="bi bi-play-fill"></i> Run Agent Now
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-section">
+      <div class="nav-section-label">Monitor</div>
+      <a class="nav-item active" onclick="go('dashboard',this)"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+      <a class="nav-item" onclick="go('anomalies',this)"><i class="bi bi-exclamation-triangle-fill"></i> Anomalies <span class="nav-badge" id="sbadge">2</span></a>
+      <a class="nav-item" onclick="go('logs',this)"><i class="bi bi-terminal-fill"></i> Run Logs</a>
+    </div>
+    <div class="sidebar-div"></div>
+    <div class="nav-section">
+      <div class="nav-section-label">Configure</div>
+      <a class="nav-item" onclick="go('settings',this)"><i class="bi bi-sliders2"></i> Settings</a>
+      <a class="nav-item" onclick="go('schedule',this)"><i class="bi bi-clock-history"></i> Schedule</a>
+    </div>
+    <div class="sidebar-div"></div>
+    <div class="nav-section">
+      <div class="nav-section-label">Resources</div>
+      <a class="nav-item" href="DEPLOYMENT_GUIDE.md" target="_blank"><i class="bi bi-book-fill"></i> Deploy Guide</a>
+      <a class="nav-item" href="#"><i class="bi bi-github"></i> Repository</a>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="uptime-box">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:var(--mono);">UPTIME TODAY</div>
+        <div style="font-family:var(--syne);font-weight:800;font-size:22px;color:var(--green);">100%</div>
+        <div class="prog-bar"><div class="prog-fill"></div></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div id="page-dashboard" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub">
+            <i class="bi bi-calendar3" style="color:var(--cyan)"></i>
+            Last run: <span id="last-run" style="color:var(--text)">Today at 07:02 AM</span>
+            &nbsp;·&nbsp;<span style="color:var(--green)"><i class="bi bi-check-circle-fill"></i> All systems operational</span>
+          </div>
+        </div>
+        <div class="hdr-actions">
+          <button class="btn-out" onclick="toast('bi-arrow-clockwise','Data refreshed','info')"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+          <button class="btn-run" onclick="triggerRun()"><i class="bi bi-play-fill"></i> Run Now</button>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics-row">
+        <div class="mc">
+          <i class="bi bi-people-fill mc-bg-icon"></i>
+          <div class="mc-label">Sessions · Today</div>
+          <div class="mc-val" id="m-sessions">—</div>
+          <div class="mc-foot"><span class="delta d-neu" id="d-sessions"><i class="bi bi-dash"></i> awaiting run</span></div>
+        </div>
+        <div class="mc green">
+          <i class="bi bi-bullseye mc-bg-icon"></i>
+          <div class="mc-label">Conversions</div>
+          <div class="mc-val" id="m-conv">—</div>
+          <div class="mc-foot"><span class="delta d-neu" id="d-conv"><i class="bi bi-dash"></i> awaiting run</span></div>
+        </div>
+        <div class="mc orange">
+          <i class="bi bi-person-plus-fill mc-bg-icon"></i>
+          <div class="mc-label">New Users</div>
+          <div class="mc-val" id="m-users">—</div>
+          <div class="mc-foot"><span class="delta d-neu" id="d-users"><i class="bi bi-dash"></i> awaiting run</span></div>
+        </div>
+        <div class="mc red">
+          <i class="bi bi-shield-exclamation mc-bg-icon"></i>
+          <div class="mc-label">Anomalies Detected</div>
+          <div class="mc-val" id="m-anom" style="color:var(--red)">—</div>
+          <div class="mc-foot"><span class="delta d-neu" id="d-anom">awaiting run</span></div>
+        </div>
+      </div>
+
+      <!-- Anomaly Table -->
+      <div class="gc">
+        <div class="gc-head">
+          <div class="gc-title"><i class="bi bi-exclamation-triangle-fill"></i> Active Anomalies</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="bdg bdg-crit" id="abadge" style="display:none;"><i class="bi bi-dot" style="font-size:16px;margin:-4px"></i><span id="acount">0</span> critical</span>
+            <button class="btn-sm" onclick="triggerRun()"><i class="bi bi-play-fill"></i> Detect Now</button>
+          </div>
+        </div>
+        <div id="anom-area">
+          <div class="empty">
+            <div class="e-icon"><i class="bi bi-check-lg"></i></div>
+            <div class="e-title">All Clear — No Anomalies</div>
+            <div class="e-sub">Run the agent to check for anomalies,<br>or wait for the 07:00 AM scheduled run.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="gc">
+        <div class="gc-head">
+          <div class="gc-title"><i class="bi bi-terminal-fill"></i> Agent Output</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#ff5f56;display:inline-block"></span>
+            <span style="width:10px;height:10px;border-radius:50%;background:#ffbd2e;display:inline-block"></span>
+            <span style="width:10px;height:10px;border-radius:50%;background:#27c93f;display:inline-block"></span>
+            <div style="flex:1"></div>
+            <button class="btn-sm" onclick="clearLog()"><i class="bi bi-trash3"></i> Clear</button>
+          </div>
+        </div>
+        <div class="terminal" id="terminal">
+          <div class="ll"><span class="lts">--:--:--</span><span class="llv ld">SYS </span><span style="color:var(--muted)">Agent ready. Press "Run Now" to trigger a manual check.</span></div>
+          <div class="ll"><span class="lts">--:--:--</span><span class="llv ld">SYS </span><span style="color:var(--muted)">Dashboard connected · ga4-agent.yourdomain.com<span class="cursor"></span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ANOMALIES ══ -->
+    <div id="page-anomalies" class="page hidden">
+      <div class="page-header">
+        <div><div class="page-title">Anomaly History</div><div class="page-sub"><i class="bi bi-database" style="color:var(--cyan)"></i> logs/anomaly_log.json</div></div>
+      </div>
+      <div class="gc">
+        <div class="empty" style="padding:80px 20px">
+          <div class="e-icon" style="background:var(--cyan-dim);border-color:rgba(0,212,255,.2);color:var(--cyan)"><i class="bi bi-broadcast"></i></div>
+          <div class="e-title">Connect Backend API</div>
+          <div class="e-sub">Add a Flask <code style="color:var(--cyan);font-family:var(--mono)">/api/anomalies</code> endpoint<br>that reads from <code style="color:var(--orange);font-family:var(--mono)">logs/anomaly_log.json</code><br><br>See <strong style="color:var(--text)">DEPLOYMENT_GUIDE.md</strong> for instructions.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ LOGS ══ -->
+    <div id="page-logs" class="page hidden">
+      <div class="page-header">
+        <div><div class="page-title">Run Logs</div><div class="page-sub"><i class="bi bi-file-text" style="color:var(--cyan)"></i> logs/agent.log from your VPS</div></div>
+        <button class="btn-out" onclick="toast('bi-arrow-clockwise','Logs refreshed','ok')"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      </div>
+      <div class="gc">
+        <div class="gc-head"><div class="gc-title"><i class="bi bi-file-earmark-code"></i> logs/agent.log</div></div>
+        <div class="terminal" style="height:400px">
+          <div class="ll"><span class="lts">07:00:01</span><span class="llv li">INFO</span><span> GA4 Anomaly Agent started at 2025-01-15T07:00:01</span></div>
+          <div class="ll"><span class="lts">07:00:02</span><span class="llv li">INFO</span><span> Step 1: Fetching GA4 data for property 123456789...</span></div>
+          <div class="ll"><span class="lts">07:00:04</span><span class="llv lo">INFO</span><span> Fetched 35 rows · Running anomaly detection...</span></div>
+          <div class="ll"><span class="lts">07:00:05</span><span class="llv lw">WARN</span><span> ⚠ ANOMALY · sessions · drop · -28.4% · z=-2.31 · critical</span></div>
+          <div class="ll"><span class="lts">07:00:05</span><span class="llv lw">WARN</span><span> ⚠ ANOMALY · conversions · drop · -31.2% · z=-2.78 · critical</span></div>
+          <div class="ll"><span class="lts">07:00:06</span><span class="llv li">INFO</span><span> Step 3: Sending to GPT-4o for root-cause analysis...</span></div>
+          <div class="ll"><span class="lts">07:00:08</span><span class="llv lo">INFO</span><span> Hypothesis generated for sessions ✓</span></div>
+          <div class="ll"><span class="lts">07:00:09</span><span class="llv lo">INFO</span><span> Slack alert sent to #ga4-alerts ✓</span></div>
+          <div class="ll"><span class="lts">07:00:10</span><span class="llv lo">INFO</span><span> Email sent to 2 recipients ✓</span></div>
+          <div class="ll"><span class="lts">07:00:10</span><span class="llv lo">INFO</span><span> ✅ Agent run complete.<span class="cursor"></span></span></div>
+        </div>
+      </div>
+      <div class="ibox" style="margin-top:16px"><strong>Live tail on VPS:</strong><br><code>tail -f /var/www/ga4-agent/backend/logs/agent.log</code></div>
+    </div>
+
+    <!-- ══ SETTINGS ══ -->
+    <div id="page-settings" class="page hidden">
+      <div class="page-header">
+        <div><div class="page-title">Settings</div><div class="page-sub"><i class="bi bi-lock-fill" style="color:var(--cyan)"></i> Secrets stored in .env on VPS — never committed to Git</div></div>
+        <button class="btn-save" onclick="saveEnv()"><i class="bi bi-download"></i> Download .env</button>
+      </div>
+      <div class="gc">
+        <div class="stabs">
+          <div class="stab active" onclick="switchStab(this,'st-ga4')"><i class="bi bi-bar-chart-fill"></i> GA4</div>
+          <div class="stab" onclick="switchStab(this,'st-openai')"><i class="bi bi-cpu-fill"></i> OpenAI</div>
+          <div class="stab" onclick="switchStab(this,'st-slack')"><i class="bi bi-slack"></i> Slack</div>
+          <div class="stab" onclick="switchStab(this,'st-email')"><i class="bi bi-envelope-fill"></i> Email</div>
+          <div class="stab" onclick="switchStab(this,'st-thresh')"><i class="bi bi-sliders"></i> Thresholds</div>
+        </div>
+
+        <div id="st-ga4" class="sbody">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div class="fg"><label class="fl">GA4 Property ID <span class="req">*</span></label><input class="fcd" id="s-ga4-id" placeholder="123456789"/><div class="fhint">Numeric only — GA4 Admin → Property Settings</div></div>
+            <div class="fg"><label class="fl">Service Account JSON Path <span class="req">*</span></label><input class="fcd" id="s-ga4-creds" placeholder="secrets/ga4-service-account.json"/><div class="fhint">Relative to the backend/ folder</div></div>
+          </div>
+          <div class="ibox"><strong>How to get GA4 credentials:</strong><br>1. Google Cloud Console → IAM → Service Accounts → Create<br>2. Grant <code>Viewer</code> role → Keys → Add Key → JSON → download<br>3. Save to <code>backend/secrets/ga4-service-account.json</code><br>4. GA4 Admin → Account Access Management → add service account email</div>
+        </div>
+
+        <div id="st-openai" class="sbody hidden">
+          <div class="fg"><label class="fl">OpenAI API Key <span class="req">*</span></label><input class="fcd" id="s-openai" type="password" placeholder="sk-..."/><div class="fhint">Get from: <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></div></div>
+          <div class="ibox">Used for GPT-4o root-cause hypothesis generation. Each agent run calls the API once per anomaly. Typical cost: <code>~$0.01–0.05 per run</code>.</div>
+        </div>
+
+        <div id="st-slack" class="sbody hidden">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div class="fg"><label class="fl">Bot OAuth Token <span class="req">*</span></label><input class="fcd" id="s-slack-tok" type="password" placeholder="xoxb-..."/><div class="fhint">api.slack.com → Your App → OAuth & Permissions</div></div>
+            <div class="fg"><label class="fl">Alert Channel <span class="req">*</span></label><input class="fcd" id="s-slack-ch" placeholder="#ga4-alerts"/><div class="fhint">Invite bot: <code style="color:var(--orange)">/invite @YourBot</code></div></div>
+          </div>
+        </div>
+
+        <div id="st-email" class="sbody hidden">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div class="fg"><label class="fl">SMTP Host</label><input class="fcd" id="s-smtp-h" placeholder="smtp.gmail.com"/></div>
+            <div class="fg"><label class="fl">SMTP Port</label><input class="fcd" id="s-smtp-p" placeholder="587"/></div>
+            <div class="fg"><label class="fl">Email Address <span class="req">*</span></label><input class="fcd" id="s-smtp-u" placeholder="youremail@gmail.com"/></div>
+            <div class="fg"><label class="fl">App Password <span class="req">*</span></label><input class="fcd" id="s-smtp-pw" type="password" placeholder="xxxx xxxx xxxx xxxx"/><div class="fhint">Gmail: Account → Security → App Passwords</div></div>
+          </div>
+          <div class="fg"><label class="fl">Alert Recipients <span class="req">*</span></label><input class="fcd" id="s-emails" placeholder="client@example.com, you@agency.com"/></div>
+        </div>
+
+        <div id="st-thresh" class="sbody hidden">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div class="fg"><label class="fl">Z-Score Threshold</label><input class="fcd" id="s-z" placeholder="2.0" type="number" step="0.1" min="1"/><div class="fhint">Default: 2.0 — lower = more sensitive</div></div>
+            <div class="fg"><label class="fl">% Deviation Threshold</label><input class="fcd" id="s-pct" placeholder="20.0" type="number" step="1" min="5"/><div class="fhint">Default: 20% — flag if ≥ this deviation from 7-day avg</div></div>
+          </div>
+          <div class="ibox"><strong>Recommended:</strong><br>• <code>Z=2.0, PCT=20%</code> — Standard (2–4 alerts/week)<br>• <code>Z=1.5, PCT=15%</code> — Sensitive (more alerts)<br>• <code>Z=2.5, PCT=30%</code> — Conservative (critical only)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SCHEDULE ══ -->
+    <div id="page-schedule" class="page hidden">
+      <div class="page-header">
+        <div><div class="page-title">Schedule</div><div class="page-sub"><i class="bi bi-clock" style="color:var(--cyan)"></i> Configure automated daily runs on your VPS</div></div>
+      </div>
+      <div class="gc">
+        <div class="gc-head"><div class="gc-title"><i class="bi bi-terminal"></i> Cron Setup (Recommended)</div></div>
+        <div style="padding:24px">
+          <p style="color:var(--soft);font-size:13px;margin-bottom:20px;line-height:1.7">Open crontab with <code style="color:var(--orange);font-family:var(--mono)">crontab -e</code> and add one of the lines below:</p>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;letter-spacing:.08em">DAILY AT 7:00 AM (RECOMMENDED)</div>
+          <div class="codebl"><span class="cm"># Run GA4 agent every day at 7:00 AM Berlin time</span><br>0 7 * * * cd /var/www/ga4-agent/backend &amp;&amp; venv/bin/python agent.py >> logs/cron.log 2>&amp;1</div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;letter-spacing:.08em">MONDAY–FRIDAY ONLY</div>
+          <div class="codebl"><span class="cm"># Weekdays only</span><br>0 7 * * 1-5 cd /var/www/ga4-agent/backend &amp;&amp; venv/bin/python agent.py >> logs/cron.log 2>&amp;1</div>
+          <div class="cron-ref" style="margin-top:20px"><strong style="color:var(--text);display:block;margin-bottom:8px">Cron reference</strong><code>0 7 * * *</code> → 7:00 AM every day<br><code>0 7 * * 1-5</code> → 7:00 AM Mon–Fri<br><code>*/30 * * * *</code> → every 30 minutes<br><code>0 */6 * * *</code> → every 6 hours</div>
+          <div class="ibox" style="margin-top:16px"><strong>Set server timezone to Germany:</strong><br><code>timedatectl set-timezone Europe/Berlin</code></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// Navigation
+function go(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  const pg = document.getElementById('page-' + name);
+  pg.classList.remove('hidden');
+  pg.style.animation = 'none'; pg.offsetHeight; pg.style.animation = '';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+// Settings tabs
+const stIds = ['st-ga4','st-openai','st-slack','st-email','st-thresh'];
+function switchStab(el, id) {
+  el.closest('.stabs').querySelectorAll('.stab').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  stIds.forEach(s => { const e = document.getElementById(s); if(e) e.classList.add('hidden'); });
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// Agent run
+function triggerRun() {
+  const term = document.getElementById('terminal');
+  term.innerHTML = '';
+  const ts = () => new Date().toLocaleTimeString('de-DE');
+  const steps = [
+    [0,    'li','INFO', 'GA4 Anomaly Agent started · ' + new Date().toISOString()],
+    [500,  'li','INFO', 'Step 1: Fetching GA4 data for property 123456789...'],
+    [1300, 'lo','INFO', 'Connected · Pulling 35 days of history'],
+    [2100, 'lo','INFO', 'Fetched 35 rows · Running Z-score detection...'],
+    [2800, 'lw','WARN', '⚠ ANOMALY · sessions · drop · -28.4% · z=-2.31 · severity=critical'],
+    [3400, 'lw','WARN', '⚠ ANOMALY · conversions · drop · -31.2% · z=-2.78 · severity=critical'],
+    [3900, 'li','INFO', 'Step 3: Calling GPT-4o for root-cause analysis...'],
+    [4800, 'lo','INFO', 'Hypothesis generated for sessions ✓'],
+    [5200, 'lo','INFO', 'Hypothesis generated for conversions ✓'],
+    [5600, 'li','INFO', 'Step 5: Sending Slack alert to #ga4-alerts...'],
+    [6100, 'lo','INFO', 'Slack alert sent ✓'],
+    [6400, 'li','INFO', 'Step 6: Sending email digest to 2 recipients...'],
+    [6900, 'lo','INFO', 'Email sent ✓'],
+    [7300, 'lo','INFO', '✅ Agent run complete · 2 anomalies detected · Next run: tomorrow 07:00'],
+  ];
+  steps.forEach(([d, cls, lvl, msg]) => {
+    setTimeout(() => {
+      const div = document.createElement('div'); div.className = 'll';
+      div.innerHTML = `<span class="lts">${ts()}</span><span class="llv ${cls}">${lvl}</span><span> ${msg}</span>`;
+      term.appendChild(div); term.scrollTop = term.scrollHeight;
+      if (d === 7300) { updateMetrics(); toast('bi-check-circle-fill','Agent run complete — 2 anomalies detected','ok'); document.getElementById('last-run').textContent = 'Just now'; }
+    }, d);
+  });
+  toast('bi-play-circle-fill','Agent started...','info');
+}
+
+function updateMetrics() {
+  anim('m-sessions','1,842'); anim('m-conv','23'); anim('m-users','1,204'); anim('m-anom','2');
+  function setDelta(id, html, cls) { const e=document.getElementById(id); e.className='delta '+cls; e.innerHTML=html; }
+  setDelta('d-sessions','<i class="bi bi-arrow-down-short"></i> -28.4% vs 7-day avg','d-down');
+  setDelta('d-conv','<i class="bi bi-arrow-down-short"></i> -31.2% vs 7-day avg','d-down');
+  setDelta('d-users','<i class="bi bi-arrow-down-short"></i> -22.1% vs 7-day avg','d-down');
+  setDelta('d-anom','<i class="bi bi-exclamation-circle-fill"></i> critical alerts','d-down');
+
+  const ab = document.getElementById('abadge');
+  ab.style.display = 'inline-flex'; document.getElementById('acount').textContent = '2';
+  document.getElementById('sbadge').textContent = '2';
+
+  document.getElementById('anom-area').innerHTML = `
+  <table class="atbl">
+    <thead><tr><th>Metric</th><th>Today</th><th>Expected</th><th>Change</th><th>Z-Score</th><th>Severity</th><th>Hypothesis</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><div class="mpill"><i class="bi bi-people-fill" style="color:var(--red)"></i> Sessions</div></td>
+        <td><span class="mono-v">1,842</span></td>
+        <td><span class="mono-v" style="color:var(--muted)">2,572</span></td>
+        <td><span class="chg dn"><i class="bi bi-arrow-down-short"></i>-28.4%</span></td>
+        <td><span class="mono-v" style="color:var(--orange)">-2.31</span></td>
+        <td><span class="bdg bdg-crit"><i class="bi bi-exclamation-circle-fill"></i> critical</span></td>
+        <td><div class="hyp-cell">Paid Search sessions dropped 34% — likely Google Ads budget exhaustion or campaign pause mid-day Tuesday.</div></td>
+        <td><div class="act-cell"><i class="bi bi-arrow-right-circle-fill"></i> Check Google Ads for budget cap or disapproved ads in last 24h.</div></td>
+      </tr>
+      <tr>
+        <td><div class="mpill"><i class="bi bi-bullseye" style="color:var(--red)"></i> Conversions</div></td>
+        <td><span class="mono-v">23</span></td>
+        <td><span class="mono-v" style="color:var(--muted)">33</span></td>
+        <td><span class="chg dn"><i class="bi bi-arrow-down-short"></i>-31.2%</span></td>
+        <td><span class="mono-v" style="color:var(--orange)">-2.78</span></td>
+        <td><span class="bdg bdg-crit"><i class="bi bi-exclamation-circle-fill"></i> critical</span></td>
+        <td><div class="hyp-cell">Conversion drop mirrors traffic drop — downstream of Paid Search issue, not a tracking or funnel problem.</div></td>
+        <td><div class="act-cell"><i class="bi bi-arrow-right-circle-fill"></i> Restore Paid Search first, then verify GA4 conversion event firing.</div></td>
+      </tr>
+    </tbody>
+  </table>`;
+}
+
+function anim(id, val) {
+  const e = document.getElementById(id);
+  e.style.transition = 'opacity .3s'; e.style.opacity = '0';
+  setTimeout(() => { e.textContent = val; e.style.opacity = '1'; }, 300);
+}
+
+function clearLog() {
+  document.getElementById('terminal').innerHTML = '';
+  toast('bi-trash3','Log cleared','info');
+}
+
+function saveEnv() {
+  const v = id => document.getElementById(id)?.value || '';
+  const lines = [
+    '# GA4 Anomaly Detection Agent — .env',
+    '',
+    `GA4_PROPERTY_ID=${v('s-ga4-id')}`,
+    `GA4_CREDENTIALS_PATH=${v('s-ga4-creds') || 'secrets/ga4-service-account.json'}`,
+    `OPENAI_API_KEY=${v('s-openai')}`,
+    `SLACK_BOT_TOKEN=${v('s-slack-tok')}`,
+    `SLACK_CHANNEL=${v('s-slack-ch') || '#ga4-alerts'}`,
+    `SMTP_HOST=${v('s-smtp-h') || 'smtp.gmail.com'}`,
+    `SMTP_PORT=${v('s-smtp-p') || '587'}`,
+    `SMTP_USER=${v('s-smtp-u')}`,
+    `SMTP_PASSWORD=${v('s-smtp-pw')}`,
+    `ALERT_EMAILS=${v('s-emails')}`,
+    `ZSCORE_THRESHOLD=${v('s-z') || '2.0'}`,
+    `PCT_DEVIATION_THRESHOLD=${v('s-pct') || '20.0'}`,
+  ].join('\n');
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([lines], {type:'text/plain'})), download: '.env' });
+  a.click();
+  toast('bi-download','.env downloaded — upload to your VPS','ok');
+}
+
+function toast(icon, msg, type) {
+  const c = {ok:'var(--green)',info:'var(--cyan)',warn:'var(--orange)',err:'var(--red)'};
+  const wrap = document.getElementById('toasts');
+  const t = document.createElement('div'); t.className = 'toast-i';
+  t.innerHTML = `<i class="bi ${icon}" style="color:${c[type]||c.info}"></i><span>${msg}</span>`;
+  wrap.appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity .4s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+ENDOFFILE
