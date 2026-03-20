@@ -1,0 +1,25 @@
+# GA4 Anomaly Detection Agent — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Google Analytics Data API
+google-analytics-data==0.18.10
+google-auth==2.29.0
+
+# Data processing & statistics
+pandas==2.2.2
+numpy==1.26.4
+
+# OpenAI GPT-4o
+openai==1.30.1
+
+# Slack SDK
+slack-sdk==3.30.0
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# HTTP (used by some SDKs)
+requests==2.32.3
+
+# Scheduler (for running agent on cron-like schedule)
+schedule==1.2.2
